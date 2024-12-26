@@ -1,0 +1,15 @@
+body { font-family: Arial, sans-serif; margin: 0; padding: 0; background-color: #f8f9fa; }
+        .container { width: 80%; margin: 20px auto; background: #fff; padding: 20px; border-radius: 5px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
+        h1 { text-align: center; color: #333; }
+        label { display: block; margin: 10px 0 5px; font-weight: bold; }
+        input, select, textarea { width: 100%; padding: 8px; margin-bottom: 15px; border: 1px solid #ddd; border-radius: 5px; box-sizing: border-box; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        table, th, td { border: 1px solid #ddd; }
+        th, td { text-align: center; padding: 10px; }
+        th { background-color: #007bff; color: white; }
+        .new { color: red; font-weight: bold; }
+        .status { color: orange; font-weight: bold; }
+        .btn-detail { background-color: #28a745; color: white; padding: 5px 10px; text-decoration: none; border-radius: 5px; }
+        .btn-detail:hover { background-color: #218838; }
+        button { background-color: #007bff; color: white; border: none; padding: 10px; border-radius: 5px; cursor: pointer; }
+        button:hover { background-color: #0056b3; }
