@@ -13,9 +13,21 @@ $conn = new mysqli($servername, $username, $password, $dbname);
 if ($conn->connect_error) {
     die("Koneksi gagal: " . $conn->connect_error);
 }
+// Pastikan session id_dokter tersedia
+if (!isset($_SESSION['id_dokter'])) {
+  die("Akses ditolak. Anda harus login sebagai dokter.");
+}
+
+$id_dokter = $_SESSION['id_dokter'];
 
 // Query untuk mengambil data pasien
-$query_pasien = $conn->query("SELECT id, nama, alamat, no_ktp, no_hp, no_rm FROM pasien");
+$query_pasien = $conn->query("SELECT DISTINCT pa.id, pa.nama, pa.alamat, pa.no_ktp, pa.no_hp, pa.no_rm
+    FROM pasien pa
+    JOIN daftar_poli dp ON pa.id = dp.id_pasien
+    JOIN jadwal_periksa jp ON dp.id_jadwal = jp.id
+    JOIN dokter dr ON jp.id_dokter = dr.id
+    WHERE dr.id = " . $id_dokter);
+
 ?>
 
 <!DOCTYPE html>

@@ -27,15 +27,15 @@ $id_pasien = $data_pasien['id'];
 // Ambil data Poli
 $query_poli = $conn->query("SELECT id, nama_poli FROM poli");
 
-// Ambil data Jadwal (gabung dengan nama dokter)
-$query_jadwal = $conn->query("
-    SELECT jp.id, jp.hari, jp.jam_mulai, jp.jam_selesai, d.nama_dokter 
-    FROM jadwal_periksa jp
-    JOIN dokter d ON jp.id_dokter = d.id
-    WHERE jp.status = 'Aktif'");
+// Ambil semua jadwal aktif
+$query_jadwal = $conn->query("SELECT jp.id, jp.hari, jp.jam_mulai, jp.jam_selesai, d.nama_dokter, p.nama_poli, d.id_poli 
+        FROM jadwal_periksa jp
+        JOIN dokter d ON jp.id_dokter = d.id
+        JOIN poli p ON d.id_poli = p.id
+        WHERE jp.status = 'Aktif'");
 
 // Proses pendaftaran Poli
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['id_jadwal'])) {
     $id_jadwal = $_POST['id_jadwal'];
     $keluhan = $_POST['keluhan'];
 
@@ -56,8 +56,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 // Ambil riwayat daftar poli untuk pasien yang sedang login
-$query_riwayat = $conn->query("
-    SELECT p.id AS poli_id, dp.id AS detail_periksa_id, d.id AS dokter_id, jp.id AS jadwal_periksa_id, 
+$query_riwayat = $conn->query("SELECT p.id AS poli_id, dp.id AS detail_periksa_id, d.id AS dokter_id, jp.id AS jadwal_periksa_id, 
            p.nama_poli, d.nama_dokter, jp.hari, jp.jam_mulai, jp.jam_selesai, 
            dp.no_antrian, dp.status, dp.waktu_periksa
     FROM daftar_poli dp
@@ -65,10 +64,9 @@ $query_riwayat = $conn->query("
     JOIN dokter d ON jp.id_dokter = d.id
     JOIN poli p ON d.id_poli = p.id
     WHERE dp.id_pasien = '$id_pasien'
-    ORDER BY dp.id DESC
-");
+    ORDER BY dp.id DESC");
 if (!$query_riwayat) {
-    die("Error query riwayat: " . $conn->error);
+    die("Error query riwayat: " . $conn->connect_error);
 }
 ?>
 
@@ -154,19 +152,19 @@ if (!$query_riwayat) {
         <input type="text" id="no_rm" value="<?php echo $data_pasien['no_rm']; ?>" readonly>
 
         <label for="poli">Pilih Poli:</label>
-        <select name="id_poli" id="poli" required>
+        <select name="id_poli" id="poli" onchange="filterJadwal()">
             <option value="">-- Pilih Poli --</option>
             <?php while ($poli = $query_poli->fetch_assoc()): ?>
                 <option value="<?php echo $poli['id']; ?>"><?php echo htmlspecialchars($poli['nama_poli']); ?></option>
             <?php endwhile; ?>
         </select>
 
-        <label for="jadwal">Pilih Jadwal (Dokter - Hari - Waktu):</label>
+        <label for="jadwal">Pilih Jadwal (Poli - Dokter - Hari - Waktu):</label>
         <select name="id_jadwal" id="jadwal" required>
             <option value="">-- Pilih Jadwal --</option>
             <?php while ($jadwal = $query_jadwal->fetch_assoc()): ?>
-                <option value="<?php echo $jadwal['id']; ?>">
-                    <?php echo htmlspecialchars($jadwal['nama_dokter'] . ' - ' . $jadwal['hari'] . ' (' . $jadwal['jam_mulai'] . ' - ' . $jadwal['jam_selesai'] . ')'); ?>
+                <option value="<?php echo $jadwal['id']; ?>" data-poli="<?php echo $jadwal['id_poli']; ?>">
+                    <?php echo htmlspecialchars($jadwal['nama_poli'] . ' - ' . $jadwal['nama_dokter'] . ' - ' . $jadwal['hari'] . ' (' . $jadwal['jam_mulai'] . ' - ' . $jadwal['jam_selesai'] . ')'); ?>
                 </option>
             <?php endwhile; ?>
         </select>
@@ -235,6 +233,26 @@ if (!$query_riwayat) {
   <!-- /.control-sidebar -->
 </div>
 <!-- ./wrapper -->
+
+<script>
+function filterJadwal() {
+    const poliSelect = document.getElementById('poli');
+    const jadwalSelect = document.getElementById('jadwal');
+    const selectedPoli = poliSelect.value;
+
+    for (let option of jadwalSelect.options) {
+        if (option.value === "") {
+            option.style.display = "";
+        } else if (option.getAttribute('data-poli') === selectedPoli || selectedPoli === "") {
+            option.style.display = "";
+        } else {
+            option.style.display = "none";
+        }
+    }
+    jadwalSelect.value = "";
+}
+</script>
+
 </body>
 </html>
 <?php $conn->close(); ?>

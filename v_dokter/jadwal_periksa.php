@@ -18,23 +18,45 @@ if (!isset($_SESSION['id_dokter']) || !isset($_SESSION['nama_dokter'])) {
     exit();
 }
 
+$id_dokter = $_SESSION['id_dokter'];
+
+// Fungsi untuk memeriksa duplikasi jadwal
+function isDuplicateSchedule($conn, $id_dokter, $hari, $exclude_id = null) {
+    $sql = "SELECT COUNT(*) AS count FROM jadwal_periksa WHERE id_dokter = ? AND hari = ?";
+    if ($exclude_id) {
+        $sql .= " AND id != ?";
+    }
+    $stmt = $conn->prepare($sql);
+    if ($exclude_id) {
+        $stmt->bind_param("isi", $id_dokter, $hari, $exclude_id);
+    } else {
+        $stmt->bind_param("is", $id_dokter, $hari);
+    }
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $data = $result->fetch_assoc();
+    return $data['count'] > 0;
+}
+
 // Proses simpan data baru
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['add_schedule'])) {
-    $id_dokter = $_SESSION['id_dokter'];
     $hari = $_POST['hari'];
     $jam_mulai = $_POST['jam_mulai'];
     $jam_selesai = $_POST['jam_selesai'];
     $status = "Tidak Aktif"; // Status default saat menambah jadwal baru
 
-    $sql = "INSERT INTO jadwal_periksa (id_dokter, hari, jam_mulai, jam_selesai, status) 
-            VALUES (?, ?, ?, ?, ?)";
-    $stmt = $conn->prepare($sql);
-    $stmt->bind_param("issss", $id_dokter, $hari, $jam_mulai, $jam_selesai, $status);
-
-    if ($stmt->execute()) {
-        echo "<script>alert('Jadwal berhasil ditambahkan dengan status Tidak Aktif!'); window.location='jadwal_periksa.php';</script>";
+    if (isDuplicateSchedule($conn, $id_dokter, $hari)) {
+        echo "<script>alert('Jadwal untuk hari yang sama sudah ada. Silakan pilih hari lain.'); window.location='jadwal_periksa.php';</script>";
     } else {
-        echo "Error: " . $conn->error;
+        $sql = "INSERT INTO jadwal_periksa (id_dokter, hari, jam_mulai, jam_selesai, status) 
+                VALUES (?, ?, ?, ?, ?)";
+        $stmt = $conn->prepare($sql);
+        $stmt->bind_param("issss", $id_dokter, $hari, $jam_mulai, $jam_selesai, $status);
+        if ($stmt->execute()) {
+            echo "<script>alert('Jadwal berhasil ditambahkan dengan status Tidak Aktif!'); window.location='jadwal_periksa.php';</script>";
+        } else {
+            echo "Error: " . $conn->error;
+        }
     }
 }
 
@@ -46,34 +68,41 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['edit_schedule'])) {
     $jam_selesai = $_POST['jam_selesai'];
     $status = $_POST['status'];
 
-    $sql = "UPDATE jadwal_periksa SET hari=?, jam_mulai=?, jam_selesai=?, status=? WHERE id=?";
-    $stmt = $conn->prepare($sql);
-    $stmt->bind_param("ssssi", $hari, $jam_mulai, $jam_selesai, $status, $id);
-
-    if ($stmt->execute()) {
-        echo "<script>alert('Jadwal berhasil diperbarui!'); window.location='jadwal_periksa.php';</script>";
+    if (isDuplicateSchedule($conn, $id_dokter, $hari, $id)) {
+        echo "<script>alert('Jadwal untuk hari yang sama sudah ada. Silakan pilih hari lain.'); window.location='jadwal_periksa.php';</script>";
     } else {
-        echo "Error: " . $conn->error;
+        $sql = "UPDATE jadwal_periksa SET hari=?, jam_mulai=?, jam_selesai=?, status=? WHERE id=? AND id_dokter=?";
+        $stmt = $conn->prepare($sql);
+        $stmt->bind_param("ssssii", $hari, $jam_mulai, $jam_selesai, $status, $id, $id_dokter);
+        if ($stmt->execute()) {
+            echo "<script>alert('Jadwal berhasil diperbarui!'); window.location='jadwal_periksa.php';</script>";
+        } else {
+            echo "Error: " . $conn->error;
+        }
     }
 }
 
-// Query untuk mengambil data jadwal periksa dan nama dokter
-$sql = "SELECT jp.id, d.nama_dokter, jp.hari, jp.jam_mulai, jp.jam_selesai, jp.status 
+// Query untuk mengambil data jadwal periksa dokter yang sedang login
+$sql = "SELECT jp.id, jp.hari, jp.jam_mulai, jp.jam_selesai, jp.status 
         FROM jadwal_periksa jp
-        JOIN dokter d ON jp.id_dokter = d.id";
-$result = $conn->query($sql);
+        WHERE jp.id_dokter = ?";
+$stmt = $conn->prepare($sql);
+$stmt->bind_param("i", $id_dokter);
+$stmt->execute();
+$result = $stmt->get_result();
 
 // Ambil data untuk edit jika ada
 $edit_data = null;
 if (isset($_GET['edit_id'])) {
     $id = $_GET['edit_id'];
-    $sql_edit = "SELECT * FROM jadwal_periksa WHERE id = ?";
-    $stmt = $conn->prepare($sql_edit);
-    $stmt->bind_param("i", $id);
-    $stmt->execute();
-    $edit_data = $stmt->get_result()->fetch_assoc();
+    $sql_edit = "SELECT * FROM jadwal_periksa WHERE id = ? AND id_dokter = ?";
+    $stmt_edit = $conn->prepare($sql_edit);
+    $stmt_edit->bind_param("ii", $id, $id_dokter);
+    $stmt_edit->execute();
+    $edit_data = $stmt_edit->get_result()->fetch_assoc();
 }
 ?>
+
 
 <!DOCTYPE html>
 <html lang="en">
@@ -206,7 +235,6 @@ if (isset($_GET['edit_id'])) {
         <thead>
           <tr>
             <th>No</th>
-            <th>Nama Dokter</th>
             <th>Hari</th>
             <th>Jam Mulai</th>
             <th>Jam Selesai</th>
@@ -221,7 +249,6 @@ if (isset($_GET['edit_id'])) {
               while ($row = $result->fetch_assoc()) {
                   echo "<tr>";
                   echo "<td>" . $no++ . "</td>";
-                  echo "<td>" . htmlspecialchars($row['nama_dokter']) . "</td>";
                   echo "<td>" . htmlspecialchars($row['hari']) . "</td>";
                   echo "<td>" . htmlspecialchars($row['jam_mulai']) . "</td>";
                   echo "<td>" . htmlspecialchars($row['jam_selesai']) . "</td>";
@@ -230,7 +257,7 @@ if (isset($_GET['edit_id'])) {
                   echo "</tr>";
               }
           } else {
-              echo "<tr><td colspan='7'>Tidak ada data jadwal periksa</td></tr>";
+              echo "<tr><td colspan='6'>Tidak ada data jadwal periksa</td></tr>";
           }
           ?>
         </tbody>

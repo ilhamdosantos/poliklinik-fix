@@ -14,9 +14,12 @@ if ($conn->connect_error) {
 
 // Ambil data daftar periksa dari tabel 'daftar_poli'
 $query_periksa = $conn->query("
-    SELECT dp.id, pa.nama AS nama_pasien, dp.keluhan, dp.no_antrian, dp.status
+    SELECT dp.id, pa.nama AS nama_pasien, dp.keluhan, dp.no_antrian, dp.status, jp.id_dokter, dr.id AS dokter_id
     FROM daftar_poli dp
     JOIN pasien pa ON dp.id_pasien = pa.id
+    JOIN jadwal_periksa jp ON dp.id_jadwal = jp.id
+    JOIN dokter dr ON jp.id_dokter = dr.id
+    WHERE dr.id = " . $_SESSION['id_dokter'] . "
     ORDER BY dp.no_antrian ASC
 ");
 ?>
